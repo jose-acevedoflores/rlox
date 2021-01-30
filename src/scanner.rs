@@ -1,7 +1,9 @@
 use crate::tokens::TokenType::*;
 use crate::tokens::{Token, TokenType};
 
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ops::Deref;
 
 lazy_static! {
     static ref KEYWORDS: HashMap<String, TokenType> = {
@@ -31,7 +33,7 @@ static DIGITS: std::ops::RangeInclusive<char> = '0'..='9';
 static ALPHA_UPPER: std::ops::RangeInclusive<char> = 'A'..='Z';
 static ALPHA_LOWER: std::ops::RangeInclusive<char> = 'a'..='z';
 
-pub struct Scanner<'a> {
+struct InnerScanner<'a> {
     src: &'a String,
     start: usize,
     current: usize,
@@ -39,9 +41,28 @@ pub struct Scanner<'a> {
     tokens: Vec<Token>,
 }
 
+pub struct Scanner<'a> {
+    //exploring interior mutability so users don't need to bind the scanner as mut
+    inner: RefCell<InnerScanner<'a>>,
+}
+
 impl<'a> Scanner<'a> {
     pub fn new(src: &'a String) -> Self {
         Scanner {
+            inner: RefCell::new(InnerScanner::new(src)),
+        }
+    }
+
+    pub fn scan_tokens(&self) -> impl Deref<Target = Vec<Token>> + '_ {
+        self.inner.borrow_mut().scan_tokens();
+
+        std::cell::Ref::map(self.inner.borrow(), |d| &d.tokens)
+    }
+}
+
+impl<'a> InnerScanner<'a> {
+    pub fn new(src: &'a String) -> Self {
+        InnerScanner {
             src,
             start: 0,
             line: 1,
@@ -114,7 +135,7 @@ impl<'a> Scanner<'a> {
             }
 
             _ => {
-                if ALPHA_LOWER.contains(&c) || ALPHA_UPPER.contains(&c) || c == '_'{
+                if ALPHA_LOWER.contains(&c) || ALPHA_UPPER.contains(&c) || c == '_' {
                     self.identifier();
                 } else {
                     println!("Unexpected character");
@@ -149,10 +170,9 @@ impl<'a> Scanner<'a> {
         if (self.current + 1) > self.src.len() {
             '\0'
         } else {
-            self.src.as_bytes()[self.current +1] as char
+            self.src.as_bytes()[self.current + 1] as char
         }
     }
-
 
     fn string(&mut self) {
         while self.peek() != '"' && !self.is_at_end() {
@@ -190,8 +210,8 @@ impl<'a> Scanner<'a> {
         self.add_token_with_value(NUMBER, Some(String::from(s)));
     }
 
-    fn identifier(&mut self){
-        while Scanner::is_alpha_numeric(&self.peek()) {
+    fn identifier(&mut self) {
+        while Self::is_alpha_numeric(&self.peek()) {
             self.advance();
         }
 
@@ -226,7 +246,7 @@ impl<'a> Scanner<'a> {
         self.add_token_with_value(tt, None);
     }
 
-    pub fn scan_tokens(&mut self) -> &Vec<Token> {
+    fn scan_tokens(&mut self) -> &Vec<Token> {
         while !self.is_at_end() {
             self.start = self.current;
             self.scan_token();
@@ -239,61 +259,72 @@ impl<'a> Scanner<'a> {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn scan_string(){
+    fn scan_string() {
         let prg = String::from("\"this is a rox string\"");
-        let mut s = Scanner::new(&prg);
+        let s = Scanner::new(&prg);
         let toks = s.scan_tokens();
 
         assert_eq!(toks.len(), 2);
 
-        let Token {tt, ..} = toks.get(1).unwrap();
+        let Token { tt, .. } = toks.get(1).unwrap();
         assert_eq!(tt, &EOF);
 
-        let Token {tt, lexeme, literal, ..} = toks.get(0).unwrap();
+        let Token {
+            tt,
+            lexeme,
+            literal,
+            ..
+        } = toks.get(0).unwrap();
         assert_eq!(tt, &STRING);
         assert_eq!(lexeme, "\"this is a rox string\"");
         assert!(literal.is_some());
         assert_eq!(literal.as_ref().unwrap(), "this is a rox string");
     }
 
-
     #[test]
-    fn scan_num(){
+    fn scan_num() {
         let prg = String::from("992");
-        let mut s = Scanner::new(&prg);
+        let s = Scanner::new(&prg);
         let toks = s.scan_tokens();
 
         assert_eq!(toks.len(), 2);
 
-        let Token {tt, ..} = toks.get(1).unwrap();
+        let Token { tt, .. } = toks.get(1).unwrap();
         assert_eq!(tt, &EOF);
 
-        let Token {tt, lexeme, literal, ..} = toks.get(0).unwrap();
+        let Token {
+            tt,
+            lexeme,
+            literal,
+            ..
+        } = toks.get(0).unwrap();
         assert_eq!(tt, &NUMBER);
         assert_eq!(lexeme, "992");
         assert!(literal.is_some());
         assert_eq!(literal.as_ref().unwrap(), "992"); // TODO fix so literal is not a string for this case
     }
 
-
     #[test]
-    fn scan_num_decimal(){
+    fn scan_num_decimal() {
         let prg = String::from("11.24");
-        let mut s = Scanner::new(&prg);
+        let s = Scanner::new(&prg);
         let toks = s.scan_tokens();
 
         assert_eq!(toks.len(), 2);
 
-        let Token {tt, ..} = toks.get(1).unwrap();
+        let Token { tt, .. } = toks.get(1).unwrap();
         assert_eq!(tt, &EOF);
 
-        let Token {tt, lexeme, literal, ..} = toks.get(0).unwrap();
+        let Token {
+            tt,
+            lexeme,
+            literal,
+            ..
+        } = toks.get(0).unwrap();
         assert_eq!(tt, &NUMBER);
         assert_eq!(lexeme, "11.24");
         assert!(literal.is_some());
@@ -301,27 +332,27 @@ mod tests {
     }
 
     #[test]
-    fn scan_identifier(){
+    fn scan_identifier() {
         let prg = String::from("heh123");
-        let mut s = Scanner::new(&prg);
+        let s = Scanner::new(&prg);
         let toks = s.scan_tokens();
 
         assert_eq!(toks.len(), 2);
 
-        let Token {tt, lexeme, literal, ..} = toks.get(0).unwrap();
+        let Token { tt, lexeme, .. } = toks.get(0).unwrap();
         assert_eq!(tt, &IDENTIFIER);
         assert_eq!(lexeme, "heh123");
     }
 
     #[test]
-    fn scan_keyword(){
+    fn scan_keyword() {
         let prg = String::from("class");
-        let mut s = Scanner::new(&prg);
+        let s = Scanner::new(&prg);
         let toks = s.scan_tokens();
 
         assert_eq!(toks.len(), 2);
 
-        let Token {tt, lexeme, literal, ..} = toks.get(0).unwrap();
+        let Token { tt, lexeme, .. } = toks.get(0).unwrap();
         assert_eq!(tt, &CLASS);
         assert_eq!(lexeme, "class");
     }
