@@ -1,5 +1,5 @@
 use crate::tokens::TokenType::*;
-use crate::tokens::{Token, TokenType};
+use crate::tokens::{LiteralValue, Token, TokenType};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -190,7 +190,7 @@ impl<'a> InnerScanner<'a> {
         self.advance();
 
         let s = &self.src.as_str()[(self.start + 1)..(self.current - 1)];
-        self.add_token_with_value(STRING, Some(String::from(s)));
+        self.add_token_with_value(STRING, LiteralValue::Str(String::from(s)));
     }
 
     fn number(&mut self) {
@@ -198,16 +198,26 @@ impl<'a> InnerScanner<'a> {
             self.advance();
         }
 
+        let mut is_float = false;
+
         if self.peek() == '.' && DIGITS.contains(&self.peek_next()) {
             //consume the . (dot)
             self.advance();
+            is_float = true;
             while DIGITS.contains(&self.peek()) {
                 self.advance();
             }
         }
 
         let s = &self.src.as_str()[self.start..self.current];
-        self.add_token_with_value(NUMBER, Some(String::from(s)));
+
+        let literal = if is_float {
+            LiteralValue::NumFloat(s.parse::<f64>().unwrap())
+        } else {
+            LiteralValue::Num(s.parse::<i64>().unwrap())
+        };
+
+        self.add_token_with_value(NUMBER, literal);
     }
 
     fn identifier(&mut self) {
@@ -236,14 +246,14 @@ impl<'a> InnerScanner<'a> {
         self.src.as_bytes()[self.current - 1] as char
     }
 
-    fn add_token_with_value(&mut self, tt: TokenType, literal: Option<String>) {
+    fn add_token_with_value(&mut self, tt: TokenType, literal: LiteralValue) {
         let txt = &self.src.as_str()[self.start..self.current];
         let tok = Token::new(tt, String::from(txt), self.line, literal);
         self.tokens.push(tok);
     }
 
     fn add_token(&mut self, tt: TokenType) {
-        self.add_token_with_value(tt, None);
+        self.add_token_with_value(tt, LiteralValue::NoVal);
     }
 
     fn scan_tokens(&mut self) -> &Vec<Token> {
@@ -252,8 +262,12 @@ impl<'a> InnerScanner<'a> {
             self.scan_token();
         }
 
-        self.tokens
-            .push(Token::new(EOF, "".to_string(), self.line, None));
+        self.tokens.push(Token::new(
+            EOF,
+            "".to_string(),
+            self.line,
+            LiteralValue::NoVal,
+        ));
 
         &self.tokens
     }
@@ -281,8 +295,11 @@ mod tests {
         } = toks.get(0).unwrap();
         assert_eq!(tt, &STRING);
         assert_eq!(lexeme, "\"this is a rox string\"");
-        assert!(literal.is_some());
-        assert_eq!(literal.as_ref().unwrap(), "this is a rox string");
+        if let LiteralValue::Str(s) = literal {
+            assert_eq!(s, "this is a rox string");
+        } else {
+            panic!("Expected String");
+        }
     }
 
     #[test]
@@ -304,12 +321,16 @@ mod tests {
         } = toks.get(0).unwrap();
         assert_eq!(tt, &NUMBER);
         assert_eq!(lexeme, "992");
-        assert!(literal.is_some());
-        assert_eq!(literal.as_ref().unwrap(), "992"); // TODO fix so literal is not a string for this case
+
+        if let LiteralValue::Num(f) = literal {
+            assert_eq!(f, &992i64);
+        } else {
+            panic!("Expected Integer ");
+        }
     }
 
     #[test]
-    fn scan_num_decimal() {
+    fn scan_num_float() {
         let prg = String::from("11.24");
         let s = Scanner::new(&prg);
         let toks = s.scan_tokens();
@@ -327,8 +348,11 @@ mod tests {
         } = toks.get(0).unwrap();
         assert_eq!(tt, &NUMBER);
         assert_eq!(lexeme, "11.24");
-        assert!(literal.is_some());
-        assert_eq!(literal.as_ref().unwrap(), "11.24"); // TODO fix so literal is not a string for this case
+        if let LiteralValue::NumFloat(f) = literal {
+            assert_eq!(f, &11.24f64);
+        } else {
+            panic!("Expected Float");
+        }
     }
 
     #[test]
@@ -339,9 +363,18 @@ mod tests {
 
         assert_eq!(toks.len(), 2);
 
-        let Token { tt, lexeme, .. } = toks.get(0).unwrap();
+        let Token {
+            tt,
+            lexeme,
+            literal,
+            ..
+        } = toks.get(0).unwrap();
         assert_eq!(tt, &IDENTIFIER);
         assert_eq!(lexeme, "heh123");
+        if let LiteralValue::NoVal = literal {
+        } else {
+            panic!("Expected No Literal");
+        }
     }
 
     #[test]

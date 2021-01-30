@@ -51,15 +51,22 @@ pub enum TokenType {
     EOF,
 }
 
+pub enum LiteralValue {
+    NoVal,
+    Num(i64),
+    NumFloat(f64),
+    Str(String),
+}
+
 pub struct Token {
     pub tt: TokenType,
     pub lexeme: String,
     line: u32,
-    pub literal: Option<String>,
+    pub literal: LiteralValue,
 }
 
 impl Token {
-    pub fn new(tt: TokenType, lexeme: String, line: u32, literal: Option<String>) -> Self {
+    pub fn new(tt: TokenType, lexeme: String, line: u32, literal: LiteralValue) -> Self {
         Token {
             tt,
             lexeme,
