@@ -1,4 +1,4 @@
-use crate::gen::expr::{Accept, Binary, Expr, Grouping, Literal, Unary, Visitor};
+use crate::gen::expr::{Accept, Binary, Expr, Grouping, Literal, Unary};
 use std::borrow::Borrow;
 
 mod gen;
