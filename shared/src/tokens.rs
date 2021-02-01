@@ -81,3 +81,14 @@ impl Display for Token {
         write!(f, "{:?} {} ", self.tt, self.lexeme)
     }
 }
+
+impl Display for LiteralValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LiteralValue::NoVal => write!(f, "nil"),
+            LiteralValue::Num(n) => write!(f, "{}", n),
+            LiteralValue::NumFloat(fl) => write!(f, "{}", fl),
+            LiteralValue::Str(s) => write!(f, "{}", s),
+        }
+    }
+}

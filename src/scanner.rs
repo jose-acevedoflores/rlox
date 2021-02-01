@@ -1,5 +1,5 @@
-use crate::tokens::TokenType::*;
-use crate::tokens::{LiteralValue, Token, TokenType};
+use shared::tokens::TokenType::*;
+use shared::tokens::{LiteralValue, Token, TokenType};
 
 use std::cell::RefCell;
 use std::collections::HashMap;

@@ -1,3 +1,4 @@
+use shared::tokens;
 use std::env;
 use std::io;
 use std::io::Write;
@@ -7,7 +8,6 @@ extern crate lazy_static;
 
 mod rlox;
 pub mod scanner;
-pub mod tokens;
 
 fn args_valid() -> Result<Option<String>, String> {
     let mut args: Vec<String> = env::args()
@@ -36,6 +36,7 @@ fn run_prompt() {
 }
 
 fn run_file(path: &String) {
+    //TODO
     println!("on path {}", path);
 }
 
