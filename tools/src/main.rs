@@ -3,19 +3,6 @@ use std::fs::File;
 use std::io;
 use std::io::Write;
 
-fn generate_ast() -> String {
-    let mut args: Vec<String> = env::args()
-        .skip(1) //skip executable name
-        .collect();
-
-    if args.len() != 1 {
-        println!("Usage: generate_ast <output directory>");
-        std::process::exit(64);
-    }
-
-    args.pop().unwrap()
-}
-
 type IORes = io::Result<usize>;
 
 fn define_ast(out_dir: &String, base_name: &str, types: &Vec<GrammarTy>) -> IORes {
@@ -94,7 +81,7 @@ fn define_struct_types(file: &mut File, base_name: &str, types: &Vec<GrammarTy>)
     file.write("\n".as_bytes())
 }
 
-fn define_visitor<'a>(file: &mut File, base_name: &str, types: &Vec<GrammarTy>) -> IORes {
+fn define_visitor(file: &mut File, base_name: &str, types: &Vec<GrammarTy>) -> IORes {
     file.write(format!("pub trait Visitor<R> {{\n").as_bytes())?;
     for ty in types {
         file.write(
@@ -170,8 +157,21 @@ fn parse_types(grammar: &Vec<String>) -> Vec<GrammarTy> {
     vec
 }
 
+fn parse_args() -> String {
+    let mut args: Vec<String> = env::args()
+        .skip(1) //skip executable name
+        .collect();
+
+    if args.len() != 1 {
+        println!("Usage: generate_ast <output directory>");
+        std::process::exit(64);
+    }
+
+    args.pop().unwrap()
+}
+
 fn main() {
-    let out_dir = generate_ast();
+    let out_dir = parse_args();
 
     let v = vec![
         "Binary   : Expr left, Token operator, Expr right".to_string(),
